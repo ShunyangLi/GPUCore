@@ -1,0 +1,126 @@
+/**
+ * @author Shunyang Li
+ * Contact: sli@cse.unsw.edu.au
+ * @date on 2023/12/16.
+ * @brief: abcore online peeling algorithm on cpu
+ */
+
+#include "core.cuh"
+
+/**
+ * abcore online peeling algorithm on cpu
+ * @param g graph
+ * @param alpha alpha value
+ * @param beta beta value
+ */
+auto c_abcore_peeling(Graph &g, int alpha, int beta) -> void {
+
+    log_info("running (alpha,beta)-core online peeling algorithm on CPU");
+
+    auto left_degree_max = std::max_element(g.degrees, g.degrees + g.u_num);
+    auto right_degree_max = std::max_element(g.degrees + g.u_num, g.degrees + g.n);
+
+    // check if the graph is valid
+    if (*left_degree_max < alpha || *right_degree_max < beta) {
+        log_error("max degree: (%d, %d), query (%d, %d) is not valid", *left_degree_max, *right_degree_max, alpha,
+                  beta);
+        exit(EXIT_FAILURE);
+    }
+
+    auto upper_to_be_peeled = std::vector<uint>();
+    auto lower_to_be_peeled = std::vector<uint>();
+
+    auto invalid_upper = std::vector<bool>(g.u_num, false);
+    auto invalid_lower = std::vector<bool>(g.l_num, false);
+
+    // copy the degree value to upper_degrees and lower_degrees
+    auto upper_degrees = std::vector<uint>(g.u_num);
+    auto lower_degrees = std::vector<uint>(g.l_num);
+
+    // copy the degree value to upper_degrees and lower_degrees
+    std::copy(g.degrees, g.degrees + g.u_num, upper_degrees.begin());
+    std::copy(g.degrees + g.u_num, g.degrees + g.n, lower_degrees.begin());
+
+    auto timer = new Timer();
+    timer->reset();
+
+    // scan the graph and find the invalid nodes
+    for (auto u = 0; u < g.u_num; u++) {
+        if (g.degrees[u] < alpha) {
+            upper_to_be_peeled.push_back(u);
+        }
+    }
+
+    for (auto v = g.u_num; v < g.n; v++) {
+        auto const v_offset = v - g.u_num;
+        if (lower_degrees[v_offset] < beta) {
+            lower_to_be_peeled.push_back(v_offset);
+        }
+    }
+
+    // peel the graph and add the invalid vertex to the queue
+    while (!upper_to_be_peeled.empty() || !lower_to_be_peeled.empty()) {
+
+        // for upper vertices
+        for (auto const &u: upper_to_be_peeled) {
+            if (invalid_upper[u]) continue;
+
+            auto const u_nbr_len = g.offsets[u + 1] - g.offsets[u];
+            auto const u_nbr = g.neighbors + g.offsets[u];
+
+            for (auto i = 0; i < u_nbr_len; i++) {
+                auto v = u_nbr[i];
+                auto const v_offset = v - g.u_num;
+                if (invalid_lower[v_offset]) continue;
+                lower_degrees[v_offset]--;
+                if (lower_degrees[v_offset] == 0) invalid_lower[v_offset] = true;
+
+                if (lower_degrees[v_offset] == beta - 1) {
+                    lower_to_be_peeled.push_back(v_offset);
+                }
+            }
+
+            upper_degrees[u] = 0;
+            invalid_upper[u] = true;
+        }
+        upper_to_be_peeled.clear();
+
+        // for lower vertices
+        for (auto const &v_offset: lower_to_be_peeled) {
+            auto v = v_offset + g.u_num;
+            if (invalid_lower[v_offset]) continue;
+
+            auto const v_nbr_len = g.offsets[v + 1] - g.offsets[v];
+            auto const v_nbr = g.neighbors + g.offsets[v];
+
+            for (auto i = 0; i < v_nbr_len; i++) {
+                auto u = v_nbr[i];
+                if (invalid_upper[u]) continue;
+                upper_degrees[u]--;
+                if (upper_degrees[u] == 0) invalid_upper[u] = true;
+
+                if (upper_degrees[u] == alpha - 1) {
+                    upper_to_be_peeled.push_back(u);
+                }
+            }
+            lower_degrees[v_offset] = 0;
+            invalid_lower[v_offset] = true;
+        }
+        lower_to_be_peeled.clear();
+    }
+
+    auto time = timer->elapsed();
+    log_info("abcore peeling time on cpu: %f s", time);
+
+    auto upper_vertices = std::vector<uint>();
+    auto lower_vertices = std::vector<uint>();
+
+    for (auto u = 0; u < g.u_num; u++)
+        if (!invalid_upper[u]) upper_vertices.push_back(u);
+    for (auto v = g.u_num; v < g.n; v++)
+        if (!invalid_lower[v - g.u_num]) lower_vertices.push_back(v);
+
+#ifdef DISPLAY_RESULT
+    log_info("upper vertices: %d, lower vertices: %d", upper_vertices.size(), lower_vertices.size());
+#endif
+}
