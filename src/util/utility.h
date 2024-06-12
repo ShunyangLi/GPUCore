@@ -84,7 +84,7 @@ static auto add_args(argparse::ArgumentParser &parser) -> void {
             .implicit_value(true);
 
     parser.add_argument("--algo")
-            .help("Algorithm to run including: bfc, hidx, msp")
+            .help("Algorithm to run")
             .default_value("msp")
             .action([](const std::string &value) { return value; });
 
