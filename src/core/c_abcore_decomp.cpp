@@ -61,8 +61,8 @@ auto peel_upper_bicore(int alpha, Graph& g, int thread, std::vector<std::vector<
         auto next_invalid_vertices = std::vector<uint>();
         while (true) {
             {
-#pragma omp parallel num_threads(thread) default(none) shared(g, invalid_vertices, alpha, dd_, pre_upper_k, stop, pre_, next_invalid_vertices, bicore_u, bicore_v)
-#pragma omp for schedule(dynamic)
+#pragma omp parallel num_threads(thread)
+#pragma omp for schedule(static)
                 for (auto const& u: invalid_vertices) {
                     if (g.degrees[u] <= 0) continue;
                     auto u_nbr_len = g.offsets[u + 1] - g.offsets[u];
@@ -136,9 +136,9 @@ auto peel_lower_bicore(int beta, Graph& g, int thread, std::vector<std::vector<u
         auto invalid_vertices = std::vector<uint>();
         // scan upper
         {
-#pragma omp parallel num_threads(thread) default(none) shared(g, invalid_vertices, dd_, pre_upper_k, stop, pre_, alpha, beta)
+#pragma omp parallel num_threads(thread)
             {
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(static)
                 for (auto u = 0; u < g.n; u++) {
                     if (g.degrees[u] <= 0) continue;
                     int threshold = u < g.u_num ? alpha : beta;
@@ -162,8 +162,8 @@ auto peel_lower_bicore(int beta, Graph& g, int thread, std::vector<std::vector<u
         auto next_invalid_vertices = std::vector<uint>();
         while (true) {
             {
-#pragma omp parallel num_threads(thread) default(none) shared(g, invalid_vertices, beta, dd_, pre_upper_k, stop, pre_, next_invalid_vertices, bicore_u, bicore_v)
-#pragma omp for schedule(dynamic)
+#pragma omp parallel num_threads(thread)
+#pragma omp for schedule(static)
                 for (auto const& u: invalid_vertices) {
                     if (g.degrees[u] <= 0) continue;
 
@@ -282,10 +282,4 @@ auto c_abcore_decomposition(Graph* g, int thread) -> void {
     auto time = timer->elapsed();
     log_info("abcore decomposition time on cpu: %f s", time);
 
-//    for (auto u = 0; u < g->u_num; u ++) {
-//        for (auto alpha = 1; alpha < bicore_index_upper[u].size(); alpha ++) {
-//            if (bicore_index_upper[u][alpha] == 0) continue ;
-//            std::cout << "u: " << u << " alpha: " << alpha << " beta: " << bicore_index_upper[u][alpha] << std::endl;
-//        }
-//    }
 }

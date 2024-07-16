@@ -8,6 +8,8 @@
 #include <iostream>
 
 #include "util/utility.h"
+#include "graph/graph.h"
+#include "core/core.cuh"
 
 int main(int argc, char* argv[]) {
 
@@ -44,6 +46,26 @@ int main(int argc, char* argv[]) {
         if (device_count == 0) log_warn("no gpu devices supporting CUDA.");
         else
             get_device_info(device_id);
+    }
+
+    if (parser.is_used("--graph")) {
+
+        // convert the graph file to binary file
+        if (parser.is_used("--bin")) {
+            const std::string& filename = parser.get<std::string>("--bin");
+            const std::string& dataset = parser.get<std::string>("--graph");
+
+            auto g = Graph(dataset, true);
+            g.graph_to_bin(filename);
+            return 0;
+        }
+
+
+        auto dataset = parser.get<std::string>("--graph");
+        auto g = Graph(dataset, false);
+
+        c_abcore_decomposition(&g, 10);
+
     }
 
 
