@@ -17,6 +17,7 @@ add_library(src
         util/timer.cuh
         util/utility.h
         util/uf.h
+        core/core.cu
 )
 
 # Link libraries (if needed)
