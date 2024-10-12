@@ -12,7 +12,7 @@
  * needs O(3n * block) memory
 */
 
-
 auto core_decomposition(Graph* g) -> void {
 
+    return;
 }

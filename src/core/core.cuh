@@ -7,7 +7,7 @@
 #ifndef BITRUSS_CORE_CUH
 #define BITRUSS_CORE_CUH
 
-#include "../graph/graph.h"
+#include "graph/graph.h"
 
 auto c_abcore_peeling(Graph& g, int alpha, int beta) -> void;
 auto g_abcore_peeling(Graph* g, int alpha, int beta) -> void;

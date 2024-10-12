@@ -18,6 +18,8 @@ add_library(src
         util/utility.h
         util/uf.h
         core/core.cu
+
+        core/core_peel.cu
 )
 
 # Link libraries (if needed)
