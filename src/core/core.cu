@@ -18,8 +18,9 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
 
     __shared__ uint d_curr_idx;
     __shared__ uint d_next_idx;
+    __shared__ uint base;
 
-    __shared__ uint beta;
+    __shared__ int beta;
 
     uint warp_id = threadIdx.x / 32;
     uint lane_id = threadIdx.x % 32;
@@ -33,32 +34,95 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
 
         d_curr_idx = 0;
         d_next_idx = 0;
-        beta = 1;
+        beta = 0;
     }
 
     __syncthreads();
 
-    uint g_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    for (uint base = 0; base < num_vertex; base += N_THREADS) {
-        uint v = base + g_idx;
-        if (v >= num_vertex) continue;
-
-        uint threshold = v < u_num ? alpha : beta;
-
-        if (d_degree[v] < threshold) {
-            uint idx = atomicAdd(&d_curr_idx, 1);
-            d_currs[idx] = v;
-        }
-    }
-
-    __syncthreads();
-
-    while (beta <= lower_max + 1) {
-
+    while (true) {
         if (threadIdx.x == 0) {
             beta += 1;
+            base = 0;
         }
+
         __syncthreads();
+
+        if (beta > lower_max + 1) break;
+
+        // then compute beta 1 - beta_max
+
+        uint g_idx = blockIdx.x * blockDim.x + threadIdx.x;
+        for (uint u = 0; u < num_vertex; u += N_THREADS) {
+            uint v = u + g_idx;
+            if (v >= num_vertex) continue;
+
+            uint threshold = v < u_num ? alpha : beta;
+
+            if (d_degree[v] < threshold) {
+                uint idx = atomicAdd(&d_curr_idx, 1);
+                d_currs[idx] = v;
+            }
+        }
+
+        __syncthreads();
+
+        while (true) {
+            __syncthreads();
+            // all the threads will evaluate to true at same iteration
+            if (base == d_curr_idx) break;
+            i = base + warp_id;
+            regTail = d_curr_idx;
+
+            __syncthreads();
+
+            if (i >= regTail) continue;// this warp won't have to do anything
+
+            if (threadIdx.x == 0) {
+                // update base for next iteration
+                base += WARPS_EACH_BLK;
+                if (regTail < base) base = regTail;
+            }
+
+            //bufTail is incremented in the code below:
+            uint v = d_curr[i];
+
+            uint start = d_offset[v];
+            uint end = d_offset[v + 1];
+
+            while (true) {
+                __syncwarp();
+
+                if (start >= end) break;
+
+                uint j = start + lane_id;
+                start += WARP_SIZE;
+                if (j >= end) continue;
+
+                uint u = d_neighbors[j];
+                int threshold = u < u_num ? alpha : beta;
+
+                int deg_u = atomicSub(d_degree + u, 1);
+
+                if ((deg_u - 1) == (threshold - 1)) {
+                    uint loc = atomicAdd(&d_next_idx, 1);
+                    d_next[loc] = u;
+                }
+            }
+
+            __syncthreads();
+
+            // swap d_next and d_curr
+            if (threadIdx.x == 0) {
+                d_curr_idx = d_next_idx;
+                d_curr = d_next;
+                d_next_idx = 0;
+
+                base = 0;
+            }
+
+            __syncthreads();
+        }
+
     }
 
 
