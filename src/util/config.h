@@ -15,6 +15,8 @@
 #define BLK_DIM 1024
 #define WARP_SIZE 32
 #define WARPS_EACH_BLK (BLK_DIM / WARP_SIZE)
+#define N_THREADS (BLK_DIM * BLK_NUMS)
+
 
 //#define COUNT_BUTTERFLY
 #define LOG_USE_COLOR

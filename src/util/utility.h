@@ -40,11 +40,6 @@ typedef unsigned int vid_t;
 typedef int num_t;
 typedef unsigned long long int ull;
 
-#define GLBUFFER_SIZE 2000000
-#define WARPS_EACH_BLK (BLK_DIM/32)
-#define WARP_SIZE 32
-#define N_THREADS (BLK_DIM * BLK_NUMS)
-
 
 static void HandleError(cudaError_t err, const char *file, int line) {
     if (err != cudaSuccess) {

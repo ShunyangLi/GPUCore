@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
         auto dataset = parser.get<std::string>("--graph");
         auto g = Graph(dataset, false);
 
-        c_abcore_decomposition(&g, 10);
+        core_decomposition(&g);
 
     }
 

@@ -14,4 +14,7 @@ auto g_abcore_peeling(Graph* g, int alpha, int beta) -> void;
 auto c_abcore_decomposition(Graph* g, int thread) -> void;
 auto abcore_decomposition(Graph* g) -> void;
 
+
+auto core_decomposition(Graph* g) -> void;
+
 #endif//BITRUSS_CORE_CUH
