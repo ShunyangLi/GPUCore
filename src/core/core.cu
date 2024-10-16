@@ -24,7 +24,7 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
     __shared__ int beta;
 
     // set alpha value
-    int alpha = blockIdx.x;
+    int alpha = blockIdx.x + 1;
 
     uint warp_id = threadIdx.x / 32;
     uint lane_id = threadIdx.x % 32;
@@ -37,8 +37,6 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
         d_degree = d_degrees + blockIdx.x * num_vertex;
         is_peel = is_peels + blockIdx.x * num_vertex;
 
-        d_curr_idx = 0;
-        d_next_idx = 0;
         beta = 0;
     }
 
@@ -46,13 +44,16 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
 
     while (true) {
         if (threadIdx.x == 0) {
+            d_curr_idx = 0;
+            d_next_idx = 0;
+
             beta += 1;
             base = 0;
         }
 
         __syncthreads();
 
-        if (beta > lower_max + 1) break;
+        if (beta >= 10) break;
 
         // then compute beta 1 - beta_max
 
@@ -63,10 +64,14 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
 
             uint threshold = v < u_num ? alpha : beta;
 
-            if (d_degree[v] < threshold && !is_peel[v]) {
+            if (d_degree[v] < threshold && is_peel[v] == 0) {
                 uint idx = atomicAdd(&d_curr_idx, 1);
                 d_currs[idx] = v;
             }
+        }
+
+        if (threadIdx.x == 0) {
+            printf("alpha: %d, beta: %d, num: %d\n", alpha, beta, d_curr_idx);
         }
 
         __syncthreads();
@@ -104,17 +109,25 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
                 if (j >= end) continue;
 
                 uint u = d_neighbors[j];
-                int threshold = u < u_num ? alpha : beta;
+                if (d_degree[u] > beta) {
 
-                int deg_u = atomicSub(d_degree + u, 1);
+                    int threshold = u < u_num ? alpha : beta;
 
-                if ((deg_u - 1) == (threshold - 1) && !is_peel[u]) {
-                    uint loc = atomicAdd(&d_next_idx, 1);
-                    d_next[loc] = u;
+                    int deg_u = atomicSub(d_degree + u, 1);
 
-                    // set peeled
-                    atomicCAS(&is_peel[u], 0, 1);
+                    if (deg_u == threshold + 1 && is_peel[u] == 0) {
+                        uint loc = atomicAdd(&d_next_idx, 1);
+                        d_next[loc] = u;
+
+                        // set peeled
+                        atomicExch(&is_peel[u],1);
+                    }
+
+                    if (deg_u <= threshold) {
+                        atomicAdd(&d_degree[u], 1);
+                    }
                 }
+
             }
 
             __syncthreads();
@@ -124,7 +137,6 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
                 d_curr_idx = d_next_idx;
                 d_curr = d_next;
                 d_next_idx = 0;
-
                 base = 0;
             }
 
@@ -184,7 +196,7 @@ auto core_decomposition(Graph* g) -> void {
     auto timer = new CudaTimer();
     timer->reset();
 
-    peel_cores<<<blk_num, BLK_DIM>>>(d_offset, d_neighbors, degrees, currs, nexts, is_peels,
+    peel_cores<<<1, BLK_DIM>>>(d_offset, d_neighbors, degrees, currs, nexts, is_peels,
             g->u_num, g->n, g->l_max_degree);
 
     cudaDeviceSynchronize();
