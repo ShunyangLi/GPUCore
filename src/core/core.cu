@@ -19,24 +19,20 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
 
     __shared__ uint d_curr_idx;
     __shared__ uint d_next_idx;
-    __shared__ uint base;
 
     __shared__ int beta;
 
     // set alpha value
     int alpha = blockIdx.x + 1;
 
-    uint warp_id = threadIdx.x / 32;
-    uint lane_id = threadIdx.x % 32;
-    uint regTail;
-    uint i;
+    uint warp_id = threadIdx.x >> 5;
+    uint lane_id = threadIdx.x & 31;
 
     if (threadIdx.x == 0) {
         d_curr = d_currs + blockIdx.x * num_vertex;
         d_next = d_nexts + blockIdx.x * num_vertex;
         d_degree = d_degrees + blockIdx.x * num_vertex;
         is_peel = is_peels + blockIdx.x * num_vertex;
-
         beta = 0;
     }
 
@@ -47,12 +43,10 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
         if (threadIdx.x == 0) {
             d_curr_idx = 0;
             d_next_idx = 0;
-
             beta += 1;
-            base = 0;
         }
         __syncthreads();
-
+        
         if (beta >= lower_max + 1) break;
 
         // then compute beta 1 - beta_max
@@ -60,11 +54,8 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
         uint idx = blockIdx.x * blockDim.x + threadIdx.x;
         uint stride = blockDim.x * gridDim.x;
 
-        for (uint u = idx; u < num_vertex; u += stride) {
-            if (u >= num_vertex) continue;
-            if (u < u_num) continue;
-
-//            int threshold = u < u_num ? alpha : beta;
+        for (uint u = u_num + idx; u < num_vertex; u += stride) {
+            if (u >= num_vertex) break;
 
             if (d_degree[u] == beta) {
                 uint loc = atomicAdd(&d_curr_idx, 1);
@@ -72,62 +63,48 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
             }
         }
 
+
+
         __syncthreads();
 
-        if (threadIdx.x == 0) {
-            printf("alpha: %d, beta: %d, num: %d\n", alpha, beta, d_curr_idx);
-        }
+
 
         while (true) {
 
             __syncthreads();
-            // all the threads will evaluate to true at same iteration
-            if (base == d_curr_idx) break;
-            i = base + warp_id;
-            regTail = d_curr_idx;
 
-            __syncthreads();
+            if (d_curr_idx == 0) break;
 
-            if (i >= regTail) continue;// this warp won't have to do anything
+            // each warp process a vertex in d_curr
 
-            if (threadIdx.x == 0) {
-                // update base for next iteration
-                base += WARPS_EACH_BLK;
-                if (regTail < base) base = regTail;
-            }
+            for (int i = warp_id; i < d_curr_idx; i += WARP_SIZE) {
 
-            //bufTail is incremented in the code below:
-            uint v = d_curr[i];
+                int v = d_curr[i];
 
-            uint start = d_offset[v];
-            uint end = d_offset[v + 1];
+                uint start = d_offset[v];
+                uint end = d_offset[v + 1];
 
-            while (true) {
-                __syncwarp();
+                for (int j = lane_id + start; j < end; j += WARP_SIZE) {
 
-                if (start >= end) break;
+                    uint u = d_neighbors[j];
+                    int threshold = u < u_num ? alpha : beta;
 
-                uint j = start + lane_id;
-                start += WARP_SIZE;
-                if (j >= end) continue;
+                    if (d_degree[u] > threshold) {
 
-                uint u = d_neighbors[j];
-                int threshold = u < u_num ? alpha : beta;
+                        int deg_u = atomicSub(d_degree + u, 1);
 
-                if (d_degree[u] > threshold) {
+                        if (deg_u == threshold + 1) {
+                            uint loc = atomicAdd(&d_next_idx, 1);
+                            d_next[loc] = u;
+                        }
 
-                    int deg_u = atomicSub(d_degree + u, 1);
-
-                    if (deg_u == threshold + 1) {
-                        uint loc = atomicAdd(&d_next_idx, 1);
-                        d_next[loc] = u;
-                    }
-
-                    if (deg_u <= threshold) {
-                        atomicAdd(&d_degree[u], 1);
+                        if (deg_u <= threshold) {
+                            atomicAdd(&d_degree[u], 1);
+                        }
                     }
                 }
 
+                __syncwarp();
             }
 
             __syncthreads();
@@ -138,7 +115,6 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
                 d_curr_idx = d_next_idx;
                 *d_curr = *d_next;
                 d_next_idx = 0;
-                base = 0;
             }
         }
 
@@ -199,7 +175,12 @@ auto core_decomposition(Graph* g) -> void {
     peel_cores<<<1, BLK_DIM>>>(d_offset, d_neighbors, degrees, currs, nexts, is_peels,
             g->u_num, g->n, g->l_max_degree);
 
-    cudaDeviceSynchronize();
+    CER(cudaDeviceSynchronize());
+
+    // copy degree back
+    int* h_degrees = new int[g->n * blk_num];
+    cudaMemcpy((void*) h_degrees, (void*) degrees, sizeof(int) * g->n * blk_num, cudaMemcpyDeviceToHost);
+
 
     auto time = timer->elapsed();
     log_info("time: %f", time);
