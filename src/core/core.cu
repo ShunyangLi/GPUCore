@@ -23,10 +23,10 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
     __shared__ int beta;
 
     // set alpha value
-    int alpha = blockIdx.x + 1;
+    int alpha = 10;
 
-    uint warp_id = threadIdx.x >> 5;
-    uint lane_id = threadIdx.x & 31;
+    int warp_id = threadIdx.x >> 5;
+    int lane_id = threadIdx.x & 31;
 
     if (threadIdx.x == 0) {
         d_curr = d_currs + blockIdx.x * num_vertex;
@@ -38,25 +38,33 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
 
     __syncthreads();
 
+    uint idx = blockIdx.x * blockDim.x + threadIdx.x;
+    uint stride = blockDim.x * gridDim.x;
+
+    for (uint u = idx; u < u_num; u += stride) {
+        if (d_degree[u] == alpha) {
+            uint loc = atomicAdd(&d_curr_idx, 1);
+            d_currs[loc] = u;
+        }
+    }
+
     while (true) {
+
+        __syncthreads();
 
         if (threadIdx.x == 0) {
             d_curr_idx = 0;
             d_next_idx = 0;
             beta += 1;
         }
+
         __syncthreads();
         
-        if (beta >= lower_max + 1) break;
+        if (beta >= 100) break;
 
         // then compute beta 1 - beta_max
 
-        uint idx = blockIdx.x * blockDim.x + threadIdx.x;
-        uint stride = blockDim.x * gridDim.x;
-
         for (uint u = u_num + idx; u < num_vertex; u += stride) {
-            if (u >= num_vertex) break;
-
             if (d_degree[u] == beta) {
                 uint loc = atomicAdd(&d_curr_idx, 1);
                 d_currs[loc] = u;
@@ -64,25 +72,18 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
         }
 
 
-
         __syncthreads();
 
 
-
         while (true) {
-
-            __syncthreads();
-
-            if (d_curr_idx == 0) break;
-
             // each warp process a vertex in d_curr
 
             for (int i = warp_id; i < d_curr_idx; i += WARP_SIZE) {
 
                 int v = d_curr[i];
 
-                uint start = d_offset[v];
-                uint end = d_offset[v + 1];
+                uint const start = d_offset[v];
+                uint const end = d_offset[v + 1];
 
                 for (int j = lane_id + start; j < end; j += WARP_SIZE) {
 
@@ -115,7 +116,13 @@ __global__ auto peel_cores(const uint* d_offset, const uint* d_neighbors, int* d
                 d_curr_idx = d_next_idx;
                 *d_curr = *d_next;
                 d_next_idx = 0;
+                // display the next peeled size and beta value
             }
+
+
+            __syncthreads();
+
+            if (d_curr_idx == 0) break;
         }
 
     }
@@ -168,7 +175,7 @@ auto core_decomposition(Graph* g) -> void {
 
 //    log_info("block number: %d", blk_num);
 
-    log_info("u_num: %d, n: %d, l_max_degree: %d", g->u_num, g->n, g->l_max_degree);
+    log_info("u_num: %d, n: %d, l_max_degree: %d, blk_num: %d", g->u_num, g->n, g->l_max_degree, blk_num);
     auto timer = new CudaTimer();
     timer->reset();
 
@@ -178,9 +185,9 @@ auto core_decomposition(Graph* g) -> void {
     CER(cudaDeviceSynchronize());
 
     // copy degree back
-    int* h_degrees = new int[g->n * blk_num];
-    cudaMemcpy((void*) h_degrees, (void*) degrees, sizeof(int) * g->n * blk_num, cudaMemcpyDeviceToHost);
-
+//    int* h_degrees = new int[g->n * blk_num];
+//    cudaMemcpy((void*) h_degrees, (void*) degrees, sizeof(int) * g->n * blk_num, cudaMemcpyDeviceToHost);
+//
 
     auto time = timer->elapsed();
     log_info("time: %f", time);
