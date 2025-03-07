@@ -9,6 +9,19 @@
 
 #include "graph/graph.h"
 
+
+
+static __device__ inline auto writeToBuffer(uint* glBuffer, uint loc, uint v) -> void {
+    assert(loc < GLBUFFER_SIZE);
+    glBuffer[loc] = v;
+}
+
+static __device__ inline auto readFromBuffer(uint* glBuffer, uint loc) -> uint {
+    assert(loc < GLBUFFER_SIZE);
+    return glBuffer[loc];
+}
+
+
 auto c_abcore_peeling(Graph& g, int alpha, int beta) -> void;
 auto g_abcore_peeling(Graph* g, int alpha, int beta) -> void;
 auto c_abcore_decomposition(Graph* g, int thread) -> void;

@@ -64,7 +64,23 @@ int main(int argc, char* argv[]) {
         auto dataset = parser.get<std::string>("--graph");
         auto g = Graph(dataset, false);
 
-        core_decomposition(&g);
+        auto pair = std::vector<std::pair<int, int>>({
+                {1, 1},
+                {2, 1},
+                {2, 2},
+                {3, 5},
+                {10, 30},
+                {55, 12},
+                {4, 22},
+                {20, 11}
+        });
+
+        for (auto& p : pair) {
+            auto alpha = p.first;
+            auto beta = p.second;
+            g_abcore_peeling(&g, alpha, beta);
+            c_abcore_peeling(g, alpha, beta);
+        }
 
     }
 
