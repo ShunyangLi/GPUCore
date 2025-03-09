@@ -59,7 +59,6 @@ __global__ auto peel_kernel(const uint* d_offset, const uint* d_neighbors, int* 
         g_buffer = g_buffers + blockIdx.x * GLBUFFER_SIZE;
     }
 
-
     while (true) {
         __syncthreads();
         // all the threads will evaluate to true at same iteration
@@ -111,7 +110,7 @@ __global__ auto peel_kernel(const uint* d_offset, const uint* d_neighbors, int* 
  * @param alpha alpha value
  * @param beta beta value
  */
-auto g_abcore_peeling(Graph* g, int alpha, int beta) -> void {
+auto g_abcore_peeling(Graph* g, int alpha, int beta) -> double {
 
     log_info("running (alpha,beta)-core online peeling algorithm on GPU");
 
@@ -121,7 +120,7 @@ auto g_abcore_peeling(Graph* g, int alpha, int beta) -> void {
     // check if the graph is valid
     if (*left_degree_max < alpha || *right_degree_max < beta) {
         log_error("max degree: (%d, %d), query (%d, %d) is not valid", *left_degree_max, *right_degree_max, alpha, beta);
-        return;
+        return 0;
     }
 
     uint* d_offset;
@@ -147,6 +146,12 @@ auto g_abcore_peeling(Graph* g, int alpha, int beta) -> void {
     timer->reset();
 
     scan_kernel<<<BLK_NUMS, BLK_DIM>>>(d_degree, buf_tails, g_buffers, alpha, beta, g->u_num, g->n);
+
+    cudaDeviceSynchronize();
+
+    log_info("abcore scan time on gpu: %f s", timer->elapsed());
+
+    timer->reset();
     peel_kernel<<<BLK_NUMS, BLK_DIM>>>(d_offset, d_neighbors, d_degree, buf_tails, g_buffers, g->u_num, alpha, beta);
 
     cudaDeviceSynchronize();
@@ -185,4 +190,6 @@ auto g_abcore_peeling(Graph* g, int alpha, int beta) -> void {
 #ifdef DISPLAY_RESULT
     log_info("upper vertices: %d, lower vertices: %d", upper_vertices.size(), lower_vertices.size());
 #endif
+
+    return time;
 }

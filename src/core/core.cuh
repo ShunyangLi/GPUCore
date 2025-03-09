@@ -22,8 +22,8 @@ static __device__ inline auto readFromBuffer(uint* glBuffer, uint loc) -> uint {
 }
 
 
-auto c_abcore_peeling(Graph& g, int alpha, int beta) -> void;
-auto g_abcore_peeling(Graph* g, int alpha, int beta) -> void;
+auto c_abcore_peeling(Graph& g, int alpha, int beta) -> double;
+auto g_abcore_peeling(Graph* g, int alpha, int beta) -> double;
 auto c_abcore_decomposition(Graph* g, int thread) -> void;
 auto abcore_decomposition(Graph* g) -> void;
 

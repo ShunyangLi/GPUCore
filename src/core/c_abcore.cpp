@@ -13,7 +13,7 @@
  * @param alpha alpha value
  * @param beta beta value
  */
-auto c_abcore_peeling(Graph &g, int alpha, int beta) -> void {
+auto c_abcore_peeling(Graph &g, int alpha, int beta) -> double {
 
     log_info("running (alpha,beta)-core online peeling algorithm on CPU");
 
@@ -123,4 +123,6 @@ auto c_abcore_peeling(Graph &g, int alpha, int beta) -> void {
 #ifdef DISPLAY_RESULT
     log_info("upper vertices: %d, lower vertices: %d", upper_vertices.size(), lower_vertices.size());
 #endif
+
+    return time;
 }

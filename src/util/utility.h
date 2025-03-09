@@ -92,6 +92,11 @@ static auto add_args(argparse::ArgumentParser &parser) -> void {
             .help("Number of threads (must be a positive integer)")
             .default_value(1)
             .action([](const std::string &value) { return std::stoi(value); });
+
+    parser.add_argument("--query")
+            .help("Query file path")
+            .default_value("/")
+            .action([](const std::string &value) { return value; });
 }
 
 

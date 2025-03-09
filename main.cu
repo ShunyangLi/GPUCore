@@ -64,24 +64,32 @@ int main(int argc, char* argv[]) {
         auto dataset = parser.get<std::string>("--graph");
         auto g = Graph(dataset, false);
 
-        auto pair = std::vector<std::pair<int, int>>({
-                {1, 1},
-                {2, 1},
-                {2, 2},
-                {3, 5},
-                {10, 30},
-                {55, 12},
-                {4, 22},
-                {20, 11}
-        });
+        if (parser.is_used("--query")) {
+            auto query_file = parser.get<std::string>("--query");
 
-        for (auto& p : pair) {
-            auto alpha = p.first;
-            auto beta = p.second;
-            g_abcore_peeling(&g, alpha, beta);
-            c_abcore_peeling(g, alpha, beta);
+
+            std::ifstream file(query_file);
+            if (!file.is_open()) {
+                std::cerr << "Error: Unable to open file!" << std::endl;
+                return 1;
+            }
+
+            int alpha, beta;
+            auto gpu_time = 0.0;
+//            auto cpu_time = 0.0;
+            int cnt = 0;
+
+            while (file >> alpha >> beta) {  // 逐行读取两个整数
+                gpu_time += g_abcore_peeling(&g, alpha, beta);
+//                cpu_time += c_abcore_peeling(g, alpha, beta);
+
+                cnt++;
+            }
+
+            log_info("gpu query average time: %f s", gpu_time / cnt);
+//            log_info("cpu query average time: %f s", cpu_time / cnt);
+
         }
-
     }
 
 
