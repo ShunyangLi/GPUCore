@@ -111,22 +111,26 @@ static auto add_args(argparse::ArgumentParser &parser) -> void {
 static auto get_device_info(int const device_id) -> void {
     cudaDeviceProp prop{};
     CER(cudaGetDeviceProperties(&prop, device_id));
+    std::ostringstream oss;
+    oss << std::left << std::setw(40) << "Property" << "Info\n";
+    oss << std::string(50, '-') << '\n';
 
-    VariadicTable<std::string, std::string> vt({"Property", "Info"}, 15);
+    oss << std::setw(40) << "Device Number" << device_id << '\n';
+    oss << std::setw(40) << "Device name" << prop.name << '\n';
+    oss << std::setw(40) << "Memory Bus Width (bits)" << prop.memoryBusWidth << '\n';
+    oss << std::setw(40) << "Peak Memory Bandwidth (GB/s)"
+        << 2.0 * prop.memoryClockRate * (float(prop.memoryBusWidth) / 8) / 1.0e6 << '\n';
+    oss << std::setw(40) << "Total global memory (bytes)" << prop.totalGlobalMem << '\n';
+    oss << std::setw(40) << "Total global memory (GB)"
+        << float(prop.totalGlobalMem) / (1024.0 * 1024.0 * 1024.0) << '\n';
+    oss << std::setw(40) << "Number of SMs" << prop.multiProcessorCount << '\n';
+    oss << std::setw(40) << "Compute Capability" << prop.major << '.' << prop.minor << '\n';
+    oss << std::setw(40) << "Shared memory per block (bytes)" << prop.sharedMemPerBlock << '\n';
+    oss << std::setw(40) << "Max threads per SM" << prop.maxThreadsPerMultiProcessor << '\n';
+    oss << std::setw(40) << "Total max threads"
+        << prop.maxThreadsPerMultiProcessor * prop.multiProcessorCount << '\n';
 
-    vt.addRow("Device Number", std::to_string(device_id));
-    vt.addRow("Device name", prop.name);
-    vt.addRow("Memory Bus Width (bits)", std::to_string(prop.memoryBusWidth));
-    vt.addRow("Peak Memory Bandwidth (GB/s)", std::to_string(2.0 * prop.memoryClockRate * (float(prop.memoryBusWidth) / 8) / 1.0e6));
-    vt.addRow("Total global memory (bytes)", std::to_string(prop.totalGlobalMem));
-    vt.addRow("Total global memory (GB)", std::to_string(float(prop.totalGlobalMem) / (1024.0 * 1024.0 * 1024.0)));
-    vt.addRow("Number of SMs", std::to_string(prop.multiProcessorCount));
-    vt.addRow("Compute Capability", std::to_string(prop.major) + std::to_string(prop.minor));
-    vt.addRow("Shared memory per block (bytes)", std::to_string(prop.sharedMemPerBlock));
-    vt.addRow("Max threads per SM", std::to_string(prop.maxThreadsPerMultiProcessor));
-    vt.addRow("Total max threads", std::to_string(prop.maxThreadsPerMultiProcessor * prop.multiProcessorCount));
-
-    vt.print(std::cout);
+    std::cout << oss.str();
 }
 
 
