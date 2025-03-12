@@ -112,7 +112,26 @@ auto Graph::process_graph(const std::string &path) -> void {
     assert(all_neighbors.size() == m * 2);
     std::copy(all_neighbors.begin(), all_neighbors.end(), neighbors);
 
-    log_info("graph with upper: %'d, lower: %'d, vertices: %'d, edges: %'d", u_num, l_num, n, m);
+    core = new int[n];
+    k_max = 0;
+    kcore(*this);
+
+
+    {
+#pragma omp parallel num_threads(THREADS)
+        {
+#pragma omp for schedule(dynamic)
+            for (int u = 0; u < n; u ++) {
+                // sort based on core value increasing order
+                std::sort(neighbors + offsets[u], neighbors + offsets[u + 1], [this](uint a, uint b) {
+                    return core[a] < core[b];
+                });
+            }
+        }
+    }
+
+
+    log_info("graph with upper: %'d, lower: %'d, vertices: %'d, edges: %'d, core max: %d", u_num, l_num, n, m, k_max);
 }
 
 Graph::Graph(const std::string &filename, bool is_to_bin) {
@@ -150,12 +169,15 @@ auto Graph::graph_to_bin(const std::string &filename) -> void {
     out.write(reinterpret_cast<const char *>(&u_max_degree), sizeof(u_max_degree));
     out.write(reinterpret_cast<const char *>(&l_max_degree), sizeof(l_max_degree));
     out.write(reinterpret_cast<const char *>(&m), sizeof(m));
+    out.write(reinterpret_cast<const char *>(&k_max), sizeof(k_max));
 
     // write array member
     auto size = static_cast<std::streamsize>(sizeof(uint));
     out.write(reinterpret_cast<const char *>(neighbors), size * 2 * m);
     out.write(reinterpret_cast<const char *>(offsets), size * (u_num + l_num + 1));
     out.write(reinterpret_cast<const char *>(degrees), size * (u_num + l_num));
+    out.write(reinterpret_cast<const char *>(core), size * n);
+
 
     out.close();
 }
@@ -179,11 +201,13 @@ auto Graph::load_graph_bin(const std::string &filename) -> void {
     in.read(reinterpret_cast<char *>(&u_max_degree), sizeof(u_max_degree));
     in.read(reinterpret_cast<char *>(&l_max_degree), sizeof(l_max_degree));
     in.read(reinterpret_cast<char *>(&m), sizeof(m));
+    in.read(reinterpret_cast<char *>(&k_max), sizeof(k_max));
 
     // allocate memory
     neighbors = new uint[2 * m];
     offsets = new uint[u_num + l_num + 1];
     degrees = new uint[u_num + l_num];
+    core = new int[n];
 
     // read array member
     auto size = static_cast<std::streamsize>(sizeof(uint));
@@ -191,10 +215,13 @@ auto Graph::load_graph_bin(const std::string &filename) -> void {
     in.read(reinterpret_cast<char *>(neighbors), size * 2 * m);
     in.read(reinterpret_cast<char *>(offsets), size * (u_num + l_num + 1));
     in.read(reinterpret_cast<char *>(degrees), size * (u_num + l_num));
+    in.read(reinterpret_cast<char *>(core), size * n);
 
     in.close();
 
-    log_info("graph with upper: %'d, lower: %'d, vertices: %'d, edges: %'d", u_num, l_num, n, m);
+    core = new int[n];
+
+    log_info("graph with upper: %'d, lower: %'d, vertices: %'d, edges: %'d, core max: %d", u_num, l_num, n, m, k_max);
 }
 
 Graph::~Graph() {

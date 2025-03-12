@@ -41,6 +41,14 @@ typedef int num_t;
 typedef unsigned long long int ull;
 
 
+typedef struct G_pointers {
+    unsigned int* neighbors;
+    unsigned int* neighbors_offset;
+    unsigned int* degrees;
+    unsigned int V;
+} G_pointers;//graph related
+
+
 static void HandleError(cudaError_t err, const char *file, int line) {
     if (err != cudaSuccess) {
         printf("%s in %s at line %d\n",

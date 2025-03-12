@@ -20,6 +20,7 @@ add_library(src
         core/core.cu
 
         core/core_peel.cu
+        core/kcore.cu
 )
 
 # Link libraries (if needed)

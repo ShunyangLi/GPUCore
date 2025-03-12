@@ -64,32 +64,34 @@ int main(int argc, char* argv[]) {
         auto dataset = parser.get<std::string>("--graph");
         auto g = Graph(dataset, false);
 
-        if (parser.is_used("--query")) {
-            auto query_file = parser.get<std::string>("--query");
+//        kcore(&g);
 
-
-            std::ifstream file(query_file);
-            if (!file.is_open()) {
-                std::cerr << "Error: Unable to open file!" << std::endl;
-                return 1;
-            }
-
-            int alpha, beta;
-            auto gpu_time = 0.0;
-//            auto cpu_time = 0.0;
-            int cnt = 0;
-
-            while (file >> alpha >> beta) {  // 逐行读取两个整数
-                gpu_time += g_abcore_peeling(&g, alpha, beta);
-//                cpu_time += c_abcore_peeling(g, alpha, beta);
-
-                cnt++;
-            }
-
-            log_info("gpu query average time: %f s", gpu_time / cnt);
-//            log_info("cpu query average time: %f s", cpu_time / cnt);
-
-        }
+//        if (parser.is_used("--query")) {
+//            auto query_file = parser.get<std::string>("--query");
+//
+//
+//            std::ifstream file(query_file);
+//            if (!file.is_open()) {
+//                std::cerr << "Error: Unable to open file!" << std::endl;
+//                return 1;
+//            }
+//
+//            int alpha, beta;
+//            auto gpu_time = 0.0;
+////            auto cpu_time = 0.0;
+//            int cnt = 0;
+//
+//            while (file >> alpha >> beta) {  // 逐行读取两个整数
+//                gpu_time += g_abcore_peeling(&g, alpha, beta);
+////                cpu_time += c_abcore_peeling(g, alpha, beta);
+//
+//                cnt++;
+//            }
+//
+//            log_info("gpu query average time: %f s", gpu_time / cnt);
+////            log_info("cpu query average time: %f s", cpu_time / cnt);
+//
+//        }
     }
 
 

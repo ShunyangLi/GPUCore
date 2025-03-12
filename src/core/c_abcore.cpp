@@ -7,6 +7,8 @@
 
 #include "core.cuh"
 
+#include <omp.h>
+
 /**
  * abcore online peeling algorithm on cpu
  * @param g graph
@@ -83,6 +85,7 @@ auto c_abcore_peeling(Graph &g, int alpha, int beta) -> double {
             upper_degrees[u] = 0;
             invalid_upper[u] = true;
         }
+
         upper_to_be_peeled.clear();
 
         // for lower vertices
@@ -108,6 +111,8 @@ auto c_abcore_peeling(Graph &g, int alpha, int beta) -> double {
         }
         lower_to_be_peeled.clear();
     }
+
+
 
     auto time = timer->elapsed();
     log_info("abcore peeling time on cpu: %f s", time);
