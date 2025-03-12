@@ -117,18 +117,18 @@ auto Graph::process_graph(const std::string &path) -> void {
     kcore(*this);
 
 
-    {
-#pragma omp parallel num_threads(THREADS)
-        {
-#pragma omp for schedule(dynamic)
-            for (int u = 0; u < n; u ++) {
-                // sort based on core value increasing order
-                std::sort(neighbors + offsets[u], neighbors + offsets[u + 1], [this](uint a, uint b) {
-                    return core[a] < core[b];
-                });
-            }
-        }
-    }
+//    {
+//#pragma omp parallel num_threads(THREADS)
+//        {
+//#pragma omp for schedule(dynamic)
+//            for (int u = 0; u < n; u ++) {
+//                // sort based on core value increasing order
+//                std::sort(neighbors + offsets[u], neighbors + offsets[u + 1], [this](uint a, uint b) {
+//                    return core[a] < core[b];
+//                });
+//            }
+//        }
+//    }
 
 
     log_info("graph with upper: %'d, lower: %'d, vertices: %'d, edges: %'d, core max: %d", u_num, l_num, n, m, k_max);

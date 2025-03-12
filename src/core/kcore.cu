@@ -168,6 +168,4 @@ auto kcore(Graph &g) -> void {
     CER(cudaFree(global_count));
     CER(cudaFree(bufTails));
     CER(cudaFree(glBuffers));
-
-
 }

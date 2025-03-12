@@ -31,5 +31,7 @@ auto kcore(Graph &g) -> void;
 
 
 auto core_decomposition(Graph* g) -> void;
+auto g_abcore_peeling_core(Graph& g, int alpha, int beta) -> double;
+auto g_abcore_peeling_adv(Graph& g, int alpha, int beta) -> double;
 
 #endif//BITRUSS_CORE_CUH
