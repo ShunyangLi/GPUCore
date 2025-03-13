@@ -147,11 +147,6 @@ auto g_abcore_peeling(Graph* g, int alpha, int beta) -> double {
 
     scan_kernel<<<BLK_NUMS, BLK_DIM>>>(d_degree, buf_tails, g_buffers, alpha, beta, g->u_num, g->n);
 
-    cudaDeviceSynchronize();
-
-    log_info("abcore scan time on gpu: %f s", timer->elapsed());
-
-    timer->reset();
     peel_kernel<<<BLK_NUMS, BLK_DIM>>>(d_offset, d_neighbors, d_degree, buf_tails, g_buffers, g->u_num, alpha, beta);
 
     cudaDeviceSynchronize();
@@ -197,7 +192,7 @@ auto g_abcore_peeling(Graph* g, int alpha, int beta) -> double {
 
 __global__ auto scan_kernel_core(int* d_degree, uint* buf_tails, uint* g_buffers,
                             int alpha, int beta, uint u_num, uint num_vertex,
-                                 const int* d_core, int k, bool* is_valid, const uint* d_offset, const uint* d_neighbors) -> void {
+                                 const int* d_core, int k, bool* is_valid, int k_max) -> void {
 
     __shared__ uint* g_buffer;
     __shared__ uint bufTail;
@@ -221,7 +216,7 @@ __global__ auto scan_kernel_core(int* d_degree, uint* buf_tails, uint* g_buffers
                 uint idx = atomicAdd(&bufTail, 1);
                 writeToBuffer(g_buffer, idx, v);
             }
-        } else if (d_core[v] >= k) {
+        } else if (d_core[v] >= k_max) {
             is_valid[v] = false;
         }
     }
@@ -343,12 +338,13 @@ auto g_abcore_peeling_core(Graph& g, int alpha, int beta) -> double {
     CER(cudaMemcpy((void*) d_core, (void*) g.core, sizeof(int) * g.n, cudaMemcpyHostToDevice));
 
     int k = std::min(alpha, beta);
+    int k_max = std::max(alpha, beta);
 
 
     auto timer = new Timer();
     timer->reset();
 
-    scan_kernel_core<<<BLK_NUMS, BLK_DIM>>>(d_degree, buf_tails, g_buffers, alpha, beta, g.u_num, g.n, d_core, k, is_valid, d_offset, d_neighbors);
+    scan_kernel_core<<<BLK_NUMS, BLK_DIM>>>(d_degree, buf_tails, g_buffers, alpha, beta, g.u_num, g.n, d_core, k, is_valid, k_max);
 
     peel_kernel_core<<<BLK_NUMS, BLK_DIM>>>(d_offset, d_neighbors, d_degree, buf_tails, g_buffers, g.u_num, alpha, beta, is_valid);
 
@@ -362,19 +358,19 @@ auto g_abcore_peeling_core(Graph& g, int alpha, int beta) -> double {
         log_trace("CUDA error: %s", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
-
-    auto upper_vertices = std::vector<uint>();
-    auto lower_vertices = std::vector<uint>();
-    auto degrees = new int[g.n];
-
-    // get degrees
-    cudaMemcpy((void*) degrees, (void*) d_degree, sizeof(int) * g.n, cudaMemcpyDeviceToHost);
-
-    // get result
-    for (auto i = 0; i < g.u_num; i++)
-        if (degrees[i] >= alpha) upper_vertices.push_back(i);
-    for (auto i = g.u_num; i < g.n; i++)
-        if (degrees[i] >= beta) lower_vertices.push_back(i);
+//
+//    auto upper_vertices = std::vector<uint>();
+//    auto lower_vertices = std::vector<uint>();
+//    auto degrees = new int[g.n];
+//
+//    // get degrees
+//    cudaMemcpy((void*) degrees, (void*) d_degree, sizeof(int) * g.n, cudaMemcpyDeviceToHost);
+//
+//    // get result
+//    for (auto i = 0; i < g.u_num; i++)
+//        if (degrees[i] >= alpha) upper_vertices.push_back(i);
+//    for (auto i = g.u_num; i < g.n; i++)
+//        if (degrees[i] >= beta) lower_vertices.push_back(i);
 
     // free cuda memory
     cudaFree(d_offset);
@@ -384,10 +380,6 @@ auto g_abcore_peeling_core(Graph& g, int alpha, int beta) -> double {
     cudaFree(g_buffers);
 
     delete timer;
-
-#ifdef DISPLAY_RESULT
-    log_info("upper vertices: %d, lower vertices: %d", upper_vertices.size(), lower_vertices.size());
-#endif
 
     return time;
 }

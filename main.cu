@@ -81,7 +81,8 @@ int main(int argc, char* argv[]) {
             int alpha, beta;
 
             while (file >> alpha >> beta) {  // 逐行读取两个整数
-                std::cout << g_abcore_peeling_adv(g, alpha, beta) << std::endl;
+                g_abcore_peeling(&g, alpha, beta);
+//                c_abcore_peeling(g, alpha, beta);
             }
 
 
