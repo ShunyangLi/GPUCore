@@ -36,4 +36,6 @@ auto g_abcore_peeling_adv(Graph& g, int alpha, int beta) -> double;
 auto g_abcore_peeling(Graph* g, int alpha, int beta) -> double;
 //auto c_abcore_peeling(Graph &g, int alpha, int beta) -> double ;
 
+auto c_abcore_peeling_mthreads(Graph &g, int alpha, int beta, int threads) -> double;
+
 #endif//BITRUSS_CORE_CUH

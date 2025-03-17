@@ -189,6 +189,7 @@ auto c_abcore_peeling_mthreads(Graph &g, int alpha, int beta, int threads) -> do
         for (auto v = g.u_num; v < g.n; v++) {
             auto const v_offset = v - g.u_num;
             if (lower_degrees[v_offset] < beta) {
+#pragma omp critical
                 lower_to_be_peeled.push_back(v_offset);
             }
         }
@@ -197,59 +198,74 @@ auto c_abcore_peeling_mthreads(Graph &g, int alpha, int beta, int threads) -> do
     // peel the graph and add the invalid vertex to the queue
     while (!upper_to_be_peeled.empty() || !lower_to_be_peeled.empty()) {
 
-        // for upper vertices
-        for (auto const &u: upper_to_be_peeled) {
-            if (invalid_upper[u]) continue;
+#pragma omp parallel
+        {
+#pragma omp for schedule(static)
+            for (int i = 0; i < upper_to_be_peeled.size(); i++) {
+                auto u = upper_to_be_peeled[i];
+                auto const u_nbr_len = g.offsets[u + 1] - g.offsets[u];
+                auto const u_nbr = g.neighbors + g.offsets[u];
 
-            auto const u_nbr_len = g.offsets[u + 1] - g.offsets[u];
-            auto const u_nbr = g.neighbors + g.offsets[u];
+                for (auto i = 0; i < u_nbr_len; i++) {
+                    auto v = u_nbr[i];
+                    auto const v_offset = v - g.u_num;
 
-            for (auto i = 0; i < u_nbr_len; i++) {
-                auto v = u_nbr[i];
-                auto const v_offset = v - g.u_num;
-                if (invalid_lower[v_offset]) continue;
-                lower_degrees[v_offset]--;
-                if (lower_degrees[v_offset] == 0) invalid_lower[v_offset] = true;
+                    // atomic operation
+                    int new_val;
+#pragma omp atomic capture
+                    new_val = --lower_degrees[v_offset];
 
-                if (lower_degrees[v_offset] == beta - 1) {
-                    lower_to_be_peeled.push_back(v_offset);
+                    if (new_val == beta - 1) {
+#pragma omp critical
+                        lower_to_be_peeled.push_back(v_offset);
+                    }
                 }
+                // atomic operation
+#pragma omp atomic write
+                upper_degrees[u] = 0;
             }
-
-            upper_degrees[u] = 0;
-            invalid_upper[u] = true;
-        }
+        };
+        // for upper vertices
+#pragma omp barrier // wait for all threads to finish the upper vertices
 
         upper_to_be_peeled.clear();
 
-        // for lower vertices
-        for (auto const &v_offset: lower_to_be_peeled) {
-            auto v = v_offset + g.u_num;
-            if (invalid_lower[v_offset]) continue;
+#pragma omp parallel
+        {
+#pragma omp for schedule(static)
+            for (int i = 0; i < lower_to_be_peeled.size(); i++) {
+                auto v_offset = lower_to_be_peeled[i];
+                auto v = v_offset + g.u_num;
 
-            auto const v_nbr_len = g.offsets[v + 1] - g.offsets[v];
-            auto const v_nbr = g.neighbors + g.offsets[v];
+                auto const v_nbr_len = g.offsets[v + 1] - g.offsets[v];
+                auto const v_nbr = g.neighbors + g.offsets[v];
 
-            for (auto i = 0; i < v_nbr_len; i++) {
-                auto u = v_nbr[i];
-                if (invalid_upper[u]) continue;
-                upper_degrees[u]--;
-                if (upper_degrees[u] == 0) invalid_upper[u] = true;
+                for (auto i = 0; i < v_nbr_len; i++) {
+                    auto u = v_nbr[i];
 
-                if (upper_degrees[u] == alpha - 1) {
-                    upper_to_be_peeled.push_back(u);
+                    int new_val;
+#pragma omp atomic capture
+                    new_val = --upper_degrees[u];
+
+                    if (new_val == alpha - 1) {
+#pragma omp critical
+                        upper_to_be_peeled.push_back(u);
+                    }
                 }
+#pragma omp atomic write
+                lower_degrees[v_offset] = 0;
             }
-            lower_degrees[v_offset] = 0;
-            invalid_lower[v_offset] = true;
+
         }
+        // for lower vertices
+#pragma omp barrier
         lower_to_be_peeled.clear();
     }
 
 
 
     auto time = timer->elapsed();
-    log_info("abcore peeling time on cpu: %f s", time);
+    log_info("abcore peeling time on cpu with %d threads: %f s", threads, time);
     //
     //    auto upper_vertices = std::vector<uint>();
     //    auto lower_vertices = std::vector<uint>();

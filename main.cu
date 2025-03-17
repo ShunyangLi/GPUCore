@@ -81,8 +81,9 @@ int main(int argc, char* argv[]) {
             int alpha, beta;
 
             while (file >> alpha >> beta) {  // 逐行读取两个整数
-                g_abcore_peeling(&g, alpha, beta);
+//                g_abcore_peeling(&g, alpha, beta);
 //                c_abcore_peeling(g, alpha, beta);
+                c_abcore_peeling_mthreads(g, alpha, beta, 32);
             }
 
 
